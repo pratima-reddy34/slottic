@@ -1,0 +1,11 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.firebase/
+firestore-debug.log
+ui-debug.log
+pglite-debug.log
+.vercel
+.DS_Store

@@ -1,0 +1,142 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Base colors */
+    --background: 30 40% 95%; /* Off-white */
+    --foreground: 30 30% 20%; /* Dark brown */
+
+    --card: 30 40% 98%;
+    --card-foreground: 30 30% 15%;
+
+    --popover: 30 40% 98%;
+    --popover-foreground: 30 30% 15%;
+
+    --primary: 30 60% 35%; /* Rich brown */
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 30 30% 90%; /* Light beige */
+    --secondary-foreground: 30 30% 15%;
+
+    --muted: 30 30% 90%;
+    --muted-foreground: 30 20% 40%;
+
+    --accent: 30 60% 45%; /* Slightly lighter brown */
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 70% 50%; /* Red for destructive actions */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 20% 80%;
+    --input: 30 20% 85%;
+    --ring: 30 60% 35%;
+
+    --radius: 0.5rem;
+
+    /* Chart colors (brown & beige tones) */
+    --chart-1: 30 60% 35%;
+    --chart-2: 30 40% 60%;
+    --chart-3: 30 20% 50%;
+    --chart-4: 30 30% 75%;
+    --chart-5: 30 10% 70%;
+
+    /* Sidebar */
+    --sidebar-background: 30 30% 97%;
+    --sidebar-foreground: 30 30% 25%;
+    --sidebar-primary: 30 60% 35%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 30 60% 85%;
+    --sidebar-accent-foreground: 30 60% 20%;
+    --sidebar-border: 30 20% 80%;
+    --sidebar-ring: 30 60% 35%;
+  }
+
+  .dark {
+    --background: 30 20% 10%;
+    --foreground: 30 30% 95%;
+
+    --card: 30 20% 15%;
+    --card-foreground: 30 30% 95%;
+
+    --popover: 30 20% 15%;
+    --popover-foreground: 30 30% 95%;
+
+    --primary: 30 60% 45%;
+    --primary-foreground: 30 30% 10%;
+
+    --secondary: 30 20% 25%;
+    --secondary-foreground: 30 30% 95%;
+
+    --muted: 30 20% 25%;
+    --muted-foreground: 30 10% 55%;
+
+    --accent: 30 60% 50%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 60% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 20% 30%;
+    --input: 30 20% 30%;
+    --ring: 30 60% 45%;
+
+    /* Chart colors */
+    --chart-1: 30 60% 45%;
+    --chart-2: 30 40% 65%;
+    --chart-3: 30 20% 55%;
+    --chart-4: 30 30% 80%;
+    --chart-5: 30 10% 75%;
+
+    /* Sidebar - Dark mode */
+    --sidebar-background: 30 10% 12%;
+    --sidebar-foreground: 30 30% 90%;
+    --sidebar-primary: 30 60% 45%;
+    --sidebar-primary-foreground: 30 30% 10%;
+    --sidebar-accent: 30 60% 25%;
+    --sidebar-accent-foreground: 30 30% 95%;
+    --sidebar-border: 30 20% 30%;
+    --sidebar-ring: 30 60% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+@keyframes pulse-slow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes ping-slow {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  75%,
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+.animate-ping-slow {
+  animation: ping-slow 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "http://localhost:9004",
+      "https://6000-idx-studio-1745821799302.cluster-w5vd22whf5gmav2vgkomwtc4go.cloudworkstations.dev",
+      "https://*.cloudworkstations.dev",
+      "https://cafe-connector-gicmg.web.app"
+    ],
+    "method": [
+      "GET",
+      "HEAD",
+      "PUT",
+      "POST",
+      "DELETE",
+      "OPTIONS"
+    ],
+    "responseHeader": [
+      "Content-Type",
+      "Access-Control-Allow-Origin",
+      "Authorization",
+      "X-Goog-Resumable",
+      "Origin"
+    ],
+    "maxAgeSeconds": 3600
+  }
+]

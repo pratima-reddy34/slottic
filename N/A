@@ -1,0 +1,68 @@
+The error messages "XMLHttpRequest cannot load ... due to access control checks" and "Preflight response is not successful. Status code: 404" strongly indicate a **CORS (Cross-Origin Resource Sharing) configuration issue** with your Firebase Storage bucket.
+
+Your code for uploading images and getting download URLs using `getDownloadURL()` in `src/app/dashboard/cafe-profile-setup/page.tsx` and `src/app/dashboard/profile-setup/page.tsx` **already follows the correct pattern** you described. The issue is not that the code is manually constructing URLs for *uploaded files*; it's that the browser is blocking requests to Firebase Storage because the storage bucket isn't configured to allow requests from your web app's origin.
+
+**Why `getDownloadURL()` is Correct and What's Likely Happening:**
+
+*   `getDownloadURL()`: This Firebase SDK method is the correct way to get a publicly accessible URL for a file in Firebase Storage. This URL often includes a temporary access token that grants read access.
+*   **CORS Preflight (OPTIONS request):** Before your browser makes the actual `PUT` (upload) or `GET` (download using the URL from `getDownloadURL`) request to Firebase Storage, it sends a "preflight" `OPTIONS` request to check if the server (Firebase Storage) allows the request from your app's domain.
+*   **404 on OPTIONS:** The "Status code: 404" on the preflight request means Firebase Storage didn't find a valid CORS policy that allows your app's domain to make these requests. This is why the subsequent `XMLHttpRequest` (which `uploadBytes` and fetching via the download URL use under the hood) fails.
+
+**Solution: Configure CORS on Your Firebase Storage Bucket**
+
+You need to tell Firebase Storage that it's okay to accept requests from your web application. The instructions for this are already in your `README.md` file, but I will reiterate the critical steps here.
+
+1.  **Create `cors.json`:**
+    If you don't have it already, create a file named `cors.json` in the root of your project with the following content:
+    ```json
+    [
+      {
+        "origin": ["*"],
+        "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
+        "responseHeader": [
+          "Content-Type",
+          "Access-Control-Allow-Origin",
+          "X-Goog-Resumable"
+        ],
+        "maxAgeSeconds": 3600
+      }
+    ]
+    ```
+    *   **Important for Production:** For a live application, replace `"*"` in `"origin": ["*"]` with your specific application domain(s) (e.g., `["https://your-app-domain.com"]`). Using `"*"` is okay for local development but is a security risk in production.
+
+2.  **Apply CORS Configuration using `gsutil`:**
+    *   Make sure you have the [Google Cloud SDK installed](https://cloud.google.com/sdk/docs/install) and `gsutil` is in your system's PATH.
+    *   Authenticate `gsutil` by running these commands in your terminal:
+        ```bash
+        gcloud auth login
+        gcloud config set project YOUR_FIREBASE_PROJECT_ID
+        ```
+        (Replace `YOUR_FIREBASE_PROJECT_ID` with your actual Firebase Project ID, e.g., `cafe-connector`).
+    *   Navigate to the directory where you saved `cors.json` and run:
+        ```bash
+        gsutil cors set cors.json gs://YOUR_FIREBASE_STORAGE_BUCKET
+        ```
+        (Replace `YOUR_FIREBASE_STORAGE_BUCKET` with your actual bucket name, e.g., `cafe-connector.appspot.com`). You can find your bucket name in the Firebase Console under Storage.
+
+**No Code Changes Required in the Upload Logic for `getDownloadURL`**
+
+The parts of your code in `cafe-profile-setup/page.tsx` and `profile-setup/page.tsx` that handle file uploads and then call `getDownloadURL` are already correct:
+
+```typescript
+// Inside handleSubmit in cafe-profile-setup/page.tsx and profile-setup/page.tsx
+// ...
+const storage = getStorage();
+for (const file of imageFiles) {
+  const imageRef = ref(storage, `cafe_images/${user.uid}/${Date.now()}_${file.name}`); // or organizer_images
+  await uploadBytes(imageRef, file);
+  const downloadURL = await getDownloadURL(imageRef); // THIS IS CORRECT
+  uploadedImageUrls.push(downloadURL);
+}
+// ...
+```
+
+This pattern correctly uses `getDownloadURL()`. The "manually constructed URLs" issue you mentioned might have been a misinterpretation or related to a different part of the code, but the core upload-and-get-URL logic is sound.
+
+**Therefore, the primary fix is to correctly configure CORS on your Firebase Storage bucket.**
+
+Since the code already uses the correct pattern for `getDownloadURL` during file uploads, and the error is a CORS issue, no changes to the file upload logic itself are needed to "fix" the use of `getDownloadURL`. The problem lies in the server-side (Firebase Storage) configuration.

@@ -1,0 +1,45 @@
+
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Allow public read access for the homepage background image
+    match /back.webp {
+      allow read: if true;
+      // Writes to back.webp should ideally be done by an admin via console or a secure backend.
+      // allow write: if request.auth != null && request.auth.token.admin == true; // Requires admin custom claim
+    }
+
+    // Cafe images are publicly readable once uploaded.
+    // Only the authenticated user matching the {userId} in the path can upload/delete.
+    match /cafe_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Organizer images are publicly readable once uploaded.
+    // Only the authenticated user matching the {userId} in the path can upload/delete.
+    match /organizer_images/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Payment proofs:
+    // - Users can upload to their own path.
+    // - Users can read their own uploaded proof.
+    // - Admins typically view these through the app, which fetches the URL from Firestore.
+    match /payment_proofs/{userId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                      && request.resource.size < 5 * 1024 * 1024 // Max 5MB
+                      && request.resource.contentType.matches('image/.*'); // Must be an image
+    }
+
+    // Deny all other access by default if not explicitly allowed above.
+    // This is often implicit if no other rules match.
+    // match /{allPaths=**} {
+    //   allow read, write: if false;
+    // }
+  }
+}
