@@ -30,7 +30,7 @@ service cloud.firestore {
     // Rules for 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if !isSignedIn(); // Allow user creation during signup
+      allow create: if !isSignedIn() || request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin(); // Allow user to update their own profile or admin to update any
       allow delete: if isAdmin(); // Only admins can delete user profiles
     }
@@ -38,7 +38,7 @@ service cloud.firestore {
     // Rules for 'cafes' collection
     match /cafes/{cafeId} {
       allow read: if isSignedIn(); // All authenticated users can browse cafes
-      allow create: if isCafeManager(); // Only cafe managers can create their profile
+      allow create: if isCafeManager() && request.auth.uid == cafeId; // Manager can create their own profile
       allow update: if isCafeManager() && request.auth.uid == resource.data.managerId; // Cafe manager can only update their own cafe profile
       allow delete: if isCafeManager() && request.auth.uid == resource.data.managerId; // Cafe manager can only delete their own cafe profile
     }
@@ -46,7 +46,8 @@ service cloud.firestore {
     // Rules for 'organizers' collection
     match /organizers/{organizerId} {
       allow read: if isSignedIn(); // All authenticated users can browse organizers
-      allow create, update, delete: if isOwner(organizerId); // Organizers can manage their own profile
+      allow create: if isOrganizer() && request.auth.uid == organizerId; // Organizer can create their own profile
+      allow update, delete: if isOwner(organizerId); // Organizers can manage their own profile
     }
 
     // Rules for 'requests' (Booking Requests)
@@ -83,3 +84,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

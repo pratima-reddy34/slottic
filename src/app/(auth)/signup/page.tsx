@@ -23,7 +23,9 @@ type Role = 'cafe_manager' | 'organizer';
 export const dynamic = 'force-dynamic';
 
 export default function SignupPage() {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [roleSpecificName, setRoleSpecificName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
@@ -45,6 +47,13 @@ export default function SignupPage() {
       });
     }
   }, [toast]);
+  
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Remove all non-digit characters
+    if (value.length <= 10) {
+      setPhone(value);
+    }
+  };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,16 +67,20 @@ export default function SignupPage() {
        return;
     }
 
-    if (!name.trim()) {
-      toast({ variant: "destructive", title: "Name Required", description: "Please enter your full name." });
+    if (!firstName.trim() || !lastName.trim()) {
+      toast({ variant: "destructive", title: "Name Required", description: "Please enter your first and last name." });
+      return;
+    }
+     if (!roleSpecificName.trim()) {
+      toast({ variant: "destructive", title: "Name Required", description: `Please enter your ${role === 'cafe_manager' ? 'Café Name' : 'Organization Name'}.` });
       return;
     }
     if (password.length < 6) {
       toast({ variant: "destructive", title: "Password Too Short", description: "Password must be at least 6 characters." });
       return;
     }
-     if (!phone.trim()) {
-      toast({ variant: "destructive", title: "Phone Required", description: "Please enter your phone number." });
+     if (phone.length !== 10) {
+      toast({ variant: "destructive", title: "Invalid Phone Number", description: "Please enter a valid 10-digit phone number." });
       return;
     }
 
@@ -76,9 +89,10 @@ export default function SignupPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
       const newUserDocument: UserProfile = {
-        name: name.trim(),
+        name: fullName,
         email: user.email!,
         role: role,
         phone: phone.trim(),
@@ -96,6 +110,32 @@ export default function SignupPage() {
 
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, newUserDocument);
+
+      // Create role-specific profile
+      if (role === 'cafe_manager') {
+        const cafeDocRef = doc(db, 'cafes', user.uid);
+        await setDoc(cafeDocRef, {
+            name: roleSpecificName.trim(),
+            managerId: user.uid,
+            personName: fullName,
+            contactEmail: user.email,
+            contactPhone: phone.trim(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+      } else if (role === 'organizer') {
+        const organizerDocRef = doc(db, 'organizers', user.uid);
+        await setDoc(organizerDocRef, {
+            organizationName: roleSpecificName.trim(),
+            organizerId: user.uid,
+            fullName: fullName,
+            email: user.email,
+            phone: phone.trim(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        });
+      }
+
 
       const idToken = await user.getIdToken(true);
       const maxAge = 60 * 60 * 24; // 1 day
@@ -142,17 +182,31 @@ export default function SignupPage() {
             </Alert>
           )}
           <form onSubmit={handleSignup} className="space-y-4">
-             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Your Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                disabled={loading || !!initError}
-              />
+             <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Your First Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    disabled={loading || !!initError}
+                />
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Your Last Name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    disabled={loading || !!initError}
+                />
+                </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -184,10 +238,12 @@ export default function SignupPage() {
               <Input
                 id="phone"
                 type="tel"
-                placeholder="e.g., 1234567890 (no + or spaces)"
+                placeholder="e.g., 1234567890"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={handlePhoneChange}
                 required
+                maxLength={10}
+                pattern="\d{10}"
                 disabled={loading || !!initError}
               />
             </div>
@@ -208,6 +264,20 @@ export default function SignupPage() {
                         <Label htmlFor="r-organizer">Organizer</Label>
                     </div>
                 </RadioGroup>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="roleSpecificName">
+                    {role === 'cafe_manager' ? 'Café Name' : 'Organization Name'}
+                </Label>
+                <Input
+                    id="roleSpecificName"
+                    type="text"
+                    placeholder={role === 'cafe_manager' ? 'e.g., The Cozy Corner' : 'e.g., Artful Events Co.'}
+                    value={roleSpecificName}
+                    onChange={(e) => setRoleSpecificName(e.target.value)}
+                    required
+                    disabled={loading || !!initError}
+                />
             </div>
             <Button type="submit" className="w-full" disabled={loading || !!initError}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
@@ -232,3 +302,5 @@ export default function SignupPage() {
     </div>
   );
 }
+
+    
