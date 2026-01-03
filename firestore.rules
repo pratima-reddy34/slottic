@@ -30,7 +30,7 @@ service cloud.firestore {
     // Rules for 'users' collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if !isSignedIn() || request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
       allow update: if isOwner(userId) || isAdmin(); // Allow user to update their own profile or admin to update any
       allow delete: if isAdmin(); // Only admins can delete user profiles
     }
