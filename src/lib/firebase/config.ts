@@ -1,9 +1,9 @@
-
 // src/lib/firebase/config.ts
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // --- Firebase Configuration from ENV ---
 const firebaseConfig: FirebaseOptions = {
@@ -34,6 +34,13 @@ try {
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
+
+  if (typeof window !== 'undefined') {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6LfKuT4sAAAAAF7bIiw9c_7MkZpf7Qh6ujFYBaRX"),
+      isTokenAutoRefreshEnabled: true,
+    });
+  }
 
   console.log("✅ Firebase initialized successfully.");
 
