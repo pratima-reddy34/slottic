@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import type { UserProfile } from '@/context/AuthContext';
+import { setCookie } from 'cookies-next';
 
 type Role = 'cafe_manager' | 'organizer';
 
@@ -96,8 +97,12 @@ export default function SignupPage() {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, newUserDocument);
 
-      toast({ title: "Signup Successful", description: "Redirecting to login..." });
-      router.push('/login');
+      const idToken = await user.getIdToken(true);
+      const maxAge = 60 * 60 * 24; // 1 day
+      setCookie('firebaseAuthToken', idToken, { path: '/', maxAge, sameSite: 'lax' });
+
+      toast({ title: "Signup Successful", description: "Redirecting to your dashboard..." });
+      router.replace('/dashboard');
 
     } catch (error: any) {
       let description = "An error occurred during signup. Please try again.";
