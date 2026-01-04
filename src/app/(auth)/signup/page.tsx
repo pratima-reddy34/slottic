@@ -136,13 +136,8 @@ export default function SignupPage() {
         });
       }
 
-
-      const idToken = await user.getIdToken(true);
-      const maxAge = 60 * 60 * 24; // 1 day
-      setCookie('firebaseAuthToken', idToken, { path: '/', maxAge, sameSite: 'lax' });
-
-      toast({ title: "Signup Successful", description: "Redirecting to your dashboard..." });
-      router.replace('/dashboard');
+      toast({ title: "Signup Successful", description: "Please log in to continue." });
+      router.push('/login');
 
     } catch (error: any) {
       let description = "An error occurred during signup. Please try again.";
