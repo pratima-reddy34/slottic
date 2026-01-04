@@ -109,7 +109,7 @@ export default function HomePage() {
     <div
       className="min-h-screen text-white font-sans bg-fixed bg-slate-800 bg-hero flex flex-col relative"
       style={{
-          backgroundImage: "url('https://firebasestorage.googleapis.com/v0/b/cafe-connector-gicmg.firebasestorage.app/o/Slottic%20home1.png?alt=media&token=78fd7e42-d383-46ff-84e5-c635979e6004')",
+          backgroundImage: "url('/images/home-bg.png'')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
       }}
