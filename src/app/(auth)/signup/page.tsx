@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth, db, firebaseInitializationError } from '@/lib/firebase/config';
 import { doc, setDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import type { UserProfile } from '@/context/AuthContext';
-import { setCookie } from 'cookies-next';
 
 type Role = 'cafe_manager' | 'organizer';
 
@@ -135,6 +134,8 @@ export default function SignupPage() {
             updatedAt: serverTimestamp(),
         });
       }
+
+      await signOut(auth);
 
       toast({ title: "Signup Successful", description: "Please log in to continue." });
       router.push('/login');
@@ -297,5 +298,4 @@ export default function SignupPage() {
     </div>
   );
 }
-
     
