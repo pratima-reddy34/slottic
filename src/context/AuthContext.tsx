@@ -89,7 +89,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       if (firebaseUser) {
         setUser(firebaseUser);
         try {
@@ -99,7 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (userDocSnap.exists()) {
             setUserProfile(userDocSnap.data() as UserProfile);
           } else {
+            // This can happen if signup fails to create the doc.
+            // Log them out to be safe and prevent an inconsistent state.
+            console.warn(`[AuthContext] User document not found for UID: ${firebaseUser.uid}. Logging out.`);
             setUserProfile(null);
+            await signOut(auth); // This will trigger onAuthStateChanged again with null.
+            return; // Exit early, the next auth state change will handle setting loading to false.
           }
         } catch (error: any) {
           console.error(`[AuthContext] Firestore Error fetching profile for ${firebaseUser.uid}:`, error);
@@ -111,9 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
         }
       } else {
+        // User is signed out.
         setUser(null);
         setUserProfile(null);
       }
+      // This is the key: always set loading to false after we've determined
+      // the auth state and attempted to fetch a profile.
       setLoading(false);
     });
 
