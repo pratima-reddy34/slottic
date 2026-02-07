@@ -185,7 +185,7 @@ export default function BrowseCafesPage() {
 
   const [cafes, setCafes] = useState<CafeData[]>([]);
   const [isLoading, setIsLoading] = useState(true); 
-  const [sentBookingRequestCafeIds, setSentBookingRequestCafeIds] = useState<Set<string>>(new Set());
+  const [sentBookingRequests, setSentBookingRequests] = useState<DocumentData[]>([]);
   const [cafeIdsWithPendingCollabInvites, setCafeIdsWithPendingCollabInvites] = useState<Set<string>>(new Set());
 
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
@@ -232,11 +232,17 @@ export default function BrowseCafesPage() {
       console.log(`[BrowseCafesPage] Organizer ${currentUserId}: Fetched ${cafeList.length} cafes.`);
 
       const bookingRequestsRef = collection(db, 'requests');
-      const sentBookingReqQuery = query(bookingRequestsRef, where('organizerId', '==', currentUserId));
+      const sentBookingReqQuery = query(bookingRequestsRef, where('organizerId', '==', currentUserId), orderBy('createdAt', 'desc'));
       const sentBookingReqSnapshot = await getDocs(sentBookingReqQuery);
-      const sentBookingIds = new Set(sentBookingReqSnapshot.docs.map(doc => doc.data().cafeId as string));
-      setSentBookingRequestCafeIds(sentBookingIds);
-      console.log(`[BrowseCafesPage] Organizer ${currentUserId}: has sent booking requests to ${sentBookingIds.size} cafes.`);
+      const latestRequestsByCafe = new Map<string, DocumentData>();
+        sentBookingReqSnapshot.docs.forEach(doc => {
+            const request = doc.data();
+            if (!latestRequestsByCafe.has(request.cafeId)) {
+                latestRequestsByCafe.set(request.cafeId, request);
+            }
+        });
+      setSentBookingRequests(Array.from(latestRequestsByCafe.values()));
+      console.log(`[BrowseCafesPage] Organizer ${currentUserId}: has sent booking requests to ${latestRequestsByCafe.size} unique cafes.`);
 
       const collabRequestsRef = collection(db, 'collaborationRequests');
       const receivedCollabReqQuery = query(
@@ -380,92 +386,113 @@ export default function BrowseCafesPage() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {cafes.map(cafe => (
-            <Card key={cafe.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
-               <div className="relative w-full h-48 bg-muted overflow-hidden">
-                 <Image
-                   src={cafe.imageUrls?.[0] || fallbackImage}
-                   alt={`Image of ${cafe.name}`}
-                   fill
-                   style={{ objectFit: 'cover' }}
-                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                   data-ai-hint={cafe.imageHint || 'cafe interior'}
-                   priority={false}
-                   onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }}
-                 />
-               </div>
+          {cafes.map(cafe => {
+            const latestRequest = sentBookingRequests.find(r => r.cafeId === cafe.id);
 
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <CardTitle>{cafe.name}</CardTitle>
-                  {cafeIdsWithPendingCollabInvites.has(cafe.id) && (
-                     <Badge variant="secondary" className="text-xs whitespace-nowrap">Invite Pending</Badge>
-                  )}
+            let buttonContent: React.ReactNode = "Request Booking";
+            let buttonDisabled = !user || (isCheckingEligibility && targetCafeForBooking?.id === cafe.id);
+            let buttonVariant: "default" | "secondary" | "destructive" | "outline" = "default";
+            let buttonExtraClasses = "";
+
+            if (latestRequest) {
+                const updatedAt = latestRequest.updatedAt?.toDate();
+                const sevenDaysAgo = dayjs().subtract(7, 'days');
+                
+                if (latestRequest.status === 'pending') {
+                    buttonContent = "Booking Sent";
+                    buttonDisabled = true;
+                    buttonExtraClasses = "bg-green-600 hover:bg-green-700 text-white";
+                } else if (latestRequest.status === 'approved') {
+                    buttonContent = "Booking Approved";
+                    buttonDisabled = true;
+                    buttonExtraClasses = "bg-blue-600 hover:bg-blue-700 text-white";
+                } else if (latestRequest.status === 'rejected' && updatedAt && dayjs(updatedAt).isAfter(sevenDaysAgo)) {
+                    const daysRemaining = dayjs(updatedAt).add(7, 'day').diff(dayjs(), 'day') + 1;
+                    buttonContent = `Rejected (Retry in ${daysRemaining}d)`;
+                    buttonDisabled = true;
+                    buttonVariant = "destructive";
+                    buttonExtraClasses = "bg-gray-500 hover:bg-gray-500 opacity-70 cursor-not-allowed";
+                }
+            }
+
+            return (
+              <Card key={cafe.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
+                <div className="relative w-full h-48 bg-muted overflow-hidden">
+                  <Image
+                    src={cafe.imageUrls?.[0] || fallbackImage}
+                    alt={`Image of ${cafe.name}`}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    data-ai-hint={cafe.imageHint || 'cafe interior'}
+                    priority={false}
+                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackImage; }}
+                  />
                 </div>
-                 <CardDescription className="flex items-center pt-1 text-sm">
-                   <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                   {cafe.location}
-                 </CardDescription>
-              </CardHeader>
 
-              <CardContent className="flex-grow space-y-3 pt-2">
-                {cafe.isFlexible ? (
-                  <>
-                    <div className="flex items-center text-sm text-green-600">
-                      <Star className="h-4 w-4 mr-1.5 text-yellow-500" stroke="currentColor" fill="none" />
-                      <span className="font-medium">Flexible Timing</span>
-                    </div>
-                    {cafe.flexibleTimingNotes && (
-                      <div className="pl-[1.375rem] text-xs text-muted-foreground relative">
-                        <Info className="absolute left-0 top-0.5 h-3.5 w-3.5 text-primary/70" />
-                        <span className="font-semibold">Notes:</span> {cafe.flexibleTimingNotes}
-                      </div>
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <CardTitle>{cafe.name}</CardTitle>
+                    {cafeIdsWithPendingCollabInvites.has(cafe.id) && (
+                      <Badge variant="secondary" className="text-xs whitespace-nowrap">Invite Pending</Badge>
                     )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center text-sm">
-                      <CalendarDays className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                      <span className="font-semibold">Days:</span>&nbsp;
-                      <span className="text-muted-foreground">{cafe.availability || <span className="italic">Not specified</span>}</span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <Clock className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                      <span className="font-semibold">Times:</span>&nbsp;
-                      <span className="text-muted-foreground">{cafe.preferredTimeSlots || <span className="italic">Not specified</span>}</span>
-                    </div>
-                  </>
-                )}
-                 <div className="mt-2">
-                    <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => { setSelectedCafeForDetails(cafe); setIsViewMoreModalOpen(true); }}>
-                        <Eye className="mr-1 h-3.5 w-3.5" /> View Full Details
-                    </Button>
-                </div>
-              </CardContent>
+                  </div>
+                  <CardDescription className="flex items-center pt-1 text-sm">
+                    <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                    {cafe.location}
+                  </CardDescription>
+                </CardHeader>
 
-              <CardFooter className="pt-4 border-t mt-auto bg-secondary/30">
-                {sentBookingRequestCafeIds.has(cafe.id) ? (
-                  <Button
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    disabled
-                  >
-                    Booking Sent
-                  </Button>
-                ) : (
+                <CardContent className="flex-grow space-y-3 pt-2">
+                  {cafe.isFlexible ? (
+                    <>
+                      <div className="flex items-center text-sm text-green-600">
+                        <Star className="h-4 w-4 mr-1.5 text-yellow-500" stroke="currentColor" fill="none" />
+                        <span className="font-medium">Flexible Timing</span>
+                      </div>
+                      {cafe.flexibleTimingNotes && (
+                        <div className="pl-[1.375rem] text-xs text-muted-foreground relative">
+                          <Info className="absolute left-0 top-0.5 h-3.5 w-3.5 text-primary/70" />
+                          <span className="font-semibold">Notes:</span> {cafe.flexibleTimingNotes}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center text-sm">
+                        <CalendarDays className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                        <span className="font-semibold">Days:</span>&nbsp;
+                        <span className="text-muted-foreground">{cafe.availability || <span className="italic">Not specified</span>}</span>
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <Clock className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                        <span className="font-semibold">Times:</span>&nbsp;
+                        <span className="text-muted-foreground">{cafe.preferredTimeSlots || <span className="italic">Not specified</span>}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="mt-2">
+                      <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => { setSelectedCafeForDetails(cafe); setIsViewMoreModalOpen(true); }}>
+                          <Eye className="mr-1 h-3.5 w-3.5" /> View Full Details
+                      </Button>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-4 border-t mt-auto bg-secondary/30">
                   <Button
                       size="sm"
-                      className="w-full"
-                      onClick={(e) => handleRequestBookingClick(e, cafe)}
-                      disabled={!user || (isCheckingEligibility && targetCafeForBooking?.id === cafe.id)}
+                      className={cn("w-full", buttonExtraClasses)}
+                      onClick={(e) => !buttonDisabled && handleRequestBookingClick(e, cafe)}
+                      disabled={buttonDisabled}
+                      variant={buttonVariant}
                   >
                     {(isCheckingEligibility && targetCafeForBooking?.id === cafe.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Request Booking
+                    {buttonContent}
                   </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       )}
       <CafeDetailsModal

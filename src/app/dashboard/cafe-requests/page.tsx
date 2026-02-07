@@ -204,7 +204,7 @@ export default function CafeManagerRequestsPage() {
       console.log(`[CafeRequests] Notification created for organizer ${targetOrganizerId}:`, notificationPayload);
     } catch (error: any) {
       console.error(`[CafeRequests] Error creating notification for organizer ${targetOrganizerId}:`, error);
-      // toast({ variant: 'destructive', title: 'Notification Error', description: 'Could not send notification to organizer.' });
+      toast({ variant: 'destructive', title: 'Notification Error', description: 'Could not send notification to organizer.' });
     }
   };
 

@@ -183,6 +183,7 @@ export default function OrganizerRequestsPage() {
       console.log(`[OrganizerRequests] Notification created for manager ${targetManagerId}:`, notificationPayload);
     } catch (error: any) {
       console.error(`[OrganizerRequests] Error creating notification for manager ${targetManagerId}:`, error);
+      toast({ variant: 'destructive', title: 'Notification Error', description: 'Could not send notification to the manager.' });
     }
   };
 

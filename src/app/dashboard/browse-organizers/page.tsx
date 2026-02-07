@@ -261,7 +261,7 @@ export default function BrowseOrganizersPage() {
 
   const [organizers, setOrganizers] = useState<OrganizerData[]>([]);
   const [isLoading, setIsLoading] = useState(true); 
-  const [sentCollaborationRequestOrganizerIds, setSentCollaborationRequestOrganizerIds] = useState<Set<string>>(new Set());
+  const [sentCollaborationRequests, setSentCollaborationRequests] = useState<DocumentData[]>([]);
   const [organizerIdsWithPendingBookingRequests, setOrganizerIdsWithPendingBookingRequests] = useState<Set<string>>(new Set());
 
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
@@ -310,11 +310,17 @@ export default function BrowseOrganizersPage() {
       console.log(`[BrowseOrganizersPage] Cafe Manager ${currentUserId}: Fetched ${organizerList.length} organizers.`);
 
       const collabRequestsRef = collection(db, 'collaborationRequests');
-      const sentCollabQuery = query(collabRequestsRef, where('managerId', '==', currentUserId));
+      const sentCollabQuery = query(collabRequestsRef, where('managerId', '==', currentUserId), orderBy('createdAt', 'desc'));
       const sentCollabSnapshot = await getDocs(sentCollabQuery);
-      const sentCollabOrgIds = new Set(sentCollabSnapshot.docs.map(doc => doc.data().organizerId as string));
-      setSentCollaborationRequestOrganizerIds(sentCollabOrgIds);
-      console.log(`[BrowseOrganizersPage] Cafe Manager ${currentUserId}: has sent collaboration requests to ${sentCollabOrgIds.size} organizers.`);
+      const latestRequestsByOrganizer = new Map<string, DocumentData>();
+        sentCollabSnapshot.docs.forEach(doc => {
+            const request = doc.data();
+            if (!latestRequestsByOrganizer.has(request.organizerId)) {
+                latestRequestsByOrganizer.set(request.organizerId, request);
+            }
+        });
+      setSentCollaborationRequests(Array.from(latestRequestsByOrganizer.values()));
+      console.log(`[BrowseOrganizersPage] Cafe Manager ${currentUserId}: has sent collaboration requests to ${latestRequestsByOrganizer.size} unique organizers.`);
 
       const bookingRequestsRef = collection(db, 'requests');
       const receivedBookingQuery = query(
@@ -450,145 +456,166 @@ export default function BrowseOrganizersPage() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {organizers.map((organizer) => (
-            <Card key={organizer.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
-              <ImageCarousel
-                images={organizer.imageUrls || []}
-                altText={`Images for ${organizer.fullName}`}
-                hint={organizer.imageHint}
-              />
+          {organizers.map((organizer) => {
+            const latestRequest = sentCollaborationRequests.find(r => r.organizerId === organizer.id);
 
-              <CardHeader className="pb-3">
-                 <div className="flex justify-between items-start">
-                    <CardTitle>{organizer.fullName}</CardTitle>
-                    {organizerIdsWithPendingBookingRequests.has(organizer.id) && (
-                        <Badge variant="destructive" className="text-xs whitespace-nowrap">Request Pending</Badge>
-                    )}
-                 </div>
-                {organizer.city && (
-                  <CardDescription className="flex items-center pt-1 text-sm">
-                    <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                    {organizer.city}
-                  </CardDescription>
-                )}
-              </CardHeader>
+            let buttonContent: React.ReactNode = <><Mail className="mr-2 h-4 w-4" /> Request Collaboration</>;
+            let buttonDisabled = !user || (isCheckingEligibility && targetOrganizerForCollab?.id === organizer.id);
+            let buttonVariant: "default" | "secondary" | "destructive" | "outline" = "default";
+            let buttonExtraClasses = "";
 
-              <CardContent className="flex-grow space-y-3 pt-0">
-                {organizer.organizerType && (
-                  <div className="flex items-center text-sm">
-                    <Briefcase className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
-                    <span className="font-medium">Type:</span>&nbsp;{organizer.organizerType}
-                  </div>
-                )}
+            if (latestRequest) {
+                const updatedAt = latestRequest.updatedAt?.toDate();
+                const sevenDaysAgo = dayjs().subtract(7, 'days');
+                
+                if (latestRequest.status === 'pending') {
+                    buttonContent = "Collaboration Sent";
+                    buttonDisabled = true;
+                    buttonExtraClasses = "bg-green-600 hover:bg-green-700 text-white";
+                } else if (latestRequest.status === 'approved') {
+                    buttonContent = "Collaboration Approved";
+                    buttonDisabled = true;
+                    buttonExtraClasses = "bg-blue-600 hover:bg-blue-700 text-white";
+                } else if (latestRequest.status === 'rejected' && updatedAt && dayjs(updatedAt).isAfter(sevenDaysAgo)) {
+                    const daysRemaining = dayjs(updatedAt).add(7, 'day').diff(dayjs(), 'day') + 1;
+                    buttonContent = `Rejected (Retry in ${daysRemaining}d)`;
+                    buttonDisabled = true;
+                    buttonVariant = "destructive";
+                    buttonExtraClasses = "bg-gray-500 hover:bg-gray-500 opacity-70 cursor-not-allowed";
+                }
+            }
 
-                {organizer.bio && (
-                  <div>
-                    <p className="text-sm text-muted-foreground line-clamp-3">
-                      {organizer.bio}
-                    </p>
-                  </div>
-                )}
+            return (
+              <Card key={organizer.id} className="flex flex-col overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
+                <ImageCarousel
+                  images={organizer.imageUrls || []}
+                  altText={`Images for ${organizer.fullName}`}
+                  hint={organizer.imageHint}
+                />
 
-                {organizer.categories && organizer.categories.length > 0 && (
-                  <div>
-                    <h4 className="font-semibold flex items-center text-sm mb-1">
-                      <Tag className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
-                      Specializes in:
-                    </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {organizer.categories.slice(0, 3).map((category, index) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {category}
-                        </Badge>
-                      ))}
-                      {organizer.categories.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          + {organizer.categories.length - 3} more
-                        </Badge>
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                      <CardTitle>{organizer.fullName}</CardTitle>
+                      {organizerIdsWithPendingBookingRequests.has(organizer.id) && (
+                          <Badge variant="destructive" className="text-xs whitespace-nowrap">Request Pending</Badge>
                       )}
-                    </div>
                   </div>
-                )}
+                  {organizer.city && (
+                    <CardDescription className="flex items-center pt-1 text-sm">
+                      <MapPin className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                      {organizer.city}
+                    </CardDescription>
+                  )}
+                </CardHeader>
 
-                {organizer.isFlexible ? (
-                    <>
-                        <div className="flex items-start text-sm mt-2 text-green-600">
-                             <Star className="h-4 w-4 mr-1.5 text-yellow-500 flex-shrink-0 mt-0.5" stroke="currentColor" fill="none"/>
-                            <div>
-                                <span className="font-medium">Flexible Timing</span>
-                            </div>
-                        </div>
-                        {organizer.flexibleTimingNotes && (
-                             <div className="pl-[1.625rem] text-xs text-muted-foreground mt-1 relative">
-                                <Info className="absolute left-0 top-0.5 h-3.5 w-3.5 text-primary/70" />
-                                <span className="font-semibold">Notes:</span> {organizer.flexibleTimingNotes}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        {(organizer.availability || organizer.preferredTimeSlots) ? (
-                            <>
-                                {organizer.availability && (
-                                    <div className="flex items-start text-sm mt-2">
-                                        <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <span className="font-medium">Preferred Days:</span>&nbsp;
-                                            <span className="text-muted-foreground">{organizer.availability}</span>
-                                        </div>
-                                    </div>
-                                )}
-                                {organizer.preferredTimeSlots && (
-                                    <div className="flex items-start text-sm mt-1">
-                                        <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                        <div>
-                                            <span className="font-medium">Preferred Times:</span>&nbsp;
-                                            <span className="text-muted-foreground">{organizer.preferredTimeSlots}</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                             <div className="flex items-start text-sm mt-2">
-                                <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                <div>
-                                    <span className="font-medium">Availability:</span>&nbsp;
-                                    <span className="text-muted-foreground italic">Not specified</span>
-                                </div>
-                            </div>
-                        )}
-                    </>
-                )}
-                 <div className="mt-2">
-                    <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => { setSelectedOrganizerForDetails(organizer); setIsViewMoreModalOpen(true); }}>
-                        <Eye className="mr-1 h-3.5 w-3.5" /> View Full Details
-                    </Button>
-                </div>
-              </CardContent>
+                <CardContent className="flex-grow space-y-3 pt-0">
+                  {organizer.organizerType && (
+                    <div className="flex items-center text-sm">
+                      <Briefcase className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0" />
+                      <span className="font-medium">Type:</span>&nbsp;{organizer.organizerType}
+                    </div>
+                  )}
 
-              <CardFooter className="pt-4 border-t mt-auto bg-secondary/30">
-                {sentCollaborationRequestOrganizerIds.has(organizer.id) ? (
+                  {organizer.bio && (
+                    <div>
+                      <p className="text-sm text-muted-foreground line-clamp-3">
+                        {organizer.bio}
+                      </p>
+                    </div>
+                  )}
+
+                  {organizer.categories && organizer.categories.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold flex items-center text-sm mb-1">
+                        <Tag className="h-4 w-4 mr-1.5 text-muted-foreground flex-shrink-0" />
+                        Specializes in:
+                      </h4>
+                      <div className="flex flex-wrap gap-1">
+                        {organizer.categories.slice(0, 3).map((category, index) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {category}
+                          </Badge>
+                        ))}
+                        {organizer.categories.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            + {organizer.categories.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {organizer.isFlexible ? (
+                      <>
+                          <div className="flex items-start text-sm mt-2 text-green-600">
+                              <Star className="h-4 w-4 mr-1.5 text-yellow-500 flex-shrink-0 mt-0.5" stroke="currentColor" fill="none"/>
+                              <div>
+                                  <span className="font-medium">Flexible Timing</span>
+                              </div>
+                          </div>
+                          {organizer.flexibleTimingNotes && (
+                              <div className="pl-[1.625rem] text-xs text-muted-foreground mt-1 relative">
+                                  <Info className="absolute left-0 top-0.5 h-3.5 w-3.5 text-primary/70" />
+                                  <span className="font-semibold">Notes:</span> {organizer.flexibleTimingNotes}
+                              </div>
+                          )}
+                      </>
+                  ) : (
+                      <>
+                          {(organizer.availability || organizer.preferredTimeSlots) ? (
+                              <>
+                                  {organizer.availability && (
+                                      <div className="flex items-start text-sm mt-2">
+                                          <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                          <div>
+                                              <span className="font-medium">Preferred Days:</span>&nbsp;
+                                              <span className="text-muted-foreground">{organizer.availability}</span>
+                                          </div>
+                                      </div>
+                                  )}
+                                  {organizer.preferredTimeSlots && (
+                                      <div className="flex items-start text-sm mt-1">
+                                          <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                          <div>
+                                              <span className="font-medium">Preferred Times:</span>&nbsp;
+                                              <span className="text-muted-foreground">{organizer.preferredTimeSlots}</span>
+                                          </div>
+                                      </div>
+                                  )}
+                              </>
+                          ) : (
+                              <div className="flex items-start text-sm mt-2">
+                                  <Clock className="h-4 w-4 mr-2 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                  <div>
+                                      <span className="font-medium">Availability:</span>&nbsp;
+                                      <span className="text-muted-foreground italic">Not specified</span>
+                                  </div>
+                              </div>
+                          )}
+                      </>
+                  )}
+                  <div className="mt-2">
+                      <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => { setSelectedOrganizerForDetails(organizer); setIsViewMoreModalOpen(true); }}>
+                          <Eye className="mr-1 h-3.5 w-3.5" /> View Full Details
+                      </Button>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-4 border-t mt-auto bg-secondary/30">
                   <Button
-                    size="sm"
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
-                    disabled
+                      size="sm"
+                      className={cn("w-full", buttonExtraClasses)}
+                      onClick={(e) => !buttonDisabled && handleRequestCollaborationClick(e, organizer)}
+                      disabled={buttonDisabled}
+                      variant={buttonVariant}
                   >
-                    Collaboration Sent
+                    {(isCheckingEligibility && targetOrganizerForCollab?.id === organizer.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {buttonContent}
                   </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={(e) => handleRequestCollaborationClick(e, organizer)}
-                    disabled={!user || (isCheckingEligibility && targetOrganizerForCollab?.id === organizer.id)}
-                  >
-                    {(isCheckingEligibility && targetOrganizerForCollab?.id === organizer.id) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                     Request Collaboration
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          ))}
+                </CardFooter>
+              </Card>
+            )
+          })}
         </div>
       )}
       <OrganizerDetailsModal
