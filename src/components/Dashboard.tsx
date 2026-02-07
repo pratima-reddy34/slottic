@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfile } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Loader2, Bell, ShieldCheck, Settings, LogOut, Coffee, Building, User as UserIcon, Briefcase, CalendarCheck2, HelpCircle, LifeBuoy, Star, Sparkles } from 'lucide-react'; // Added Star, Sparkles
+import { Loader2, Bell, ShieldCheck, Settings, LogOut, Coffee, Building, User as UserIcon, Briefcase, CalendarCheck2, HelpCircle, LifeBuoy, Star, Sparkles, Send } from 'lucide-react'; // Added Star, Sparkles
 import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -140,12 +140,13 @@ function OrganizerDashboard({ userId, userName }: { userId: string; userName?: s
 
   const dashboardLinks = [
     { href: '/dashboard/browse-cafes', label: 'Browse & Book Cafés', icon: Building, id: 'browse-cafes-link', tourId: 'browse-cafes-link' },
+    { href: '/dashboard/my-requests', label: 'My Sent Booking Requests', icon: Send, id: 'my-requests-link', tourId: 'my-requests-link' },
     { href: '/dashboard/organizer-requests', label: 'Incoming Collaboration Requests', icon: CalendarCheck2, count: pendingCollaborationRequestsCount, id: 'organizer-requests-link', tourId: 'organizer-requests-link' },
     { href: '/dashboard/organizer-profile-setup', label: 'Profile Setup', icon: Settings, id: 'profile-setup-link', tourId: 'profile-setup-link' },
   ];
 
   return (
-    <Card className="w-full max-w-2xl mx-auto shadow-xl h-96">
+    <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="text-2xl font-bold text-center text-primary">Organizer Dashboard</CardTitle>
          <CardDescription className="text-center text-sm text-muted-foreground pt-2">

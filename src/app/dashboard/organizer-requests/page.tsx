@@ -173,7 +173,7 @@ export default function OrganizerRequestsPage() {
       const notificationsRef = collection(db, 'notifications', targetManagerId, 'userNotifications');
       const notificationPayload = {
         message: `Your collaboration request to "${organizerName || 'an organizer'}" for "${cafeName || 'your cafe'}" has been ${newStatus}.`,
-        link: `/dashboard/cafe-requests`, // Link to where a manager sees their sent requests
+        link: `/dashboard/browse-organizers`, 
         timestamp: serverTimestamp(),
         unread: true,
         triggeredBy: user.uid, // Organizer's UID

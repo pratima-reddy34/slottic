@@ -67,8 +67,9 @@ service cloud.firestore {
     }
     
     // Rules for 'notifications' collection
-    match /notifications/{userId}/{document=**} {
-      allow read, write: if isOwner(userId);
+    match /notifications/{userId}/userNotifications/{notificationId} {
+      allow read, update, delete: if isOwner(userId);
+      allow create: if isSignedIn();
     }
 
     // Rules for 'chats' collection
@@ -84,5 +85,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
