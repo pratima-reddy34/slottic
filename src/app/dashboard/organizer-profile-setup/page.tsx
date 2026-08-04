@@ -1,6 +1,4 @@
-
 'use client';
-
 import React, { useState, useEffect, type FormEvent, useCallback } from "react";
 import { doc, setDoc, getDoc, serverTimestamp, type FieldValue } from "firebase/firestore";
 import { db, storage as firebaseStorage } from '@/lib/firebase/config';
@@ -17,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Switch } from "@/components/ui/switch";
-
 interface OrganizerProfileFormData {
   id?: string;
   fullName: string;
@@ -46,7 +43,6 @@ interface OrganizerProfileFormData {
   createdAt?: FieldValue;
   updatedAt?: FieldValue;
 }
-
 const initialFormData: OrganizerProfileFormData = {
   fullName: "",
   organizationName: "",
@@ -67,7 +63,6 @@ const initialFormData: OrganizerProfileFormData = {
   socialLinks: { instagram: "", facebook: "", website: "", youtube: "" },
   specialRequirements: "",
 };
-
 const eventCategories = [
     "Art Workshops (Painting, Resin Art, etc.)",
     "Music Performances (Live Band, DJ)",
@@ -79,21 +74,17 @@ const eventCategories = [
     "Tech Meetup/Coding Workshop",
     "Craft Fair/Market Stall",
 ];
-
 export default function OrganizerProfileSetupPage() {
     const router = useRouter();
     const { user, userProfile, loading: authLoading } = useAuth();
     const { toast } = useToast();
-
     const [formData, setFormData] = useState<OrganizerProfileFormData>(initialFormData);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [newLanguage, setNewLanguage] = useState("");
     const [isNewProfile, setIsNewProfile] = useState(false);
-
-
-    const fetchOrganizerProfile = useCallback(async () => {
+  const fetchOrganizerProfile = useCallback(async () => {
         if (!user || userProfile?.role !== 'organizer') {
             setIsLoading(false);
             return;
@@ -102,7 +93,6 @@ export default function OrganizerProfileSetupPage() {
         try {
             const organizerDocRef = doc(db, "organizers", user.uid);
             const docSnap = await getDoc(organizerDocRef);
-
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setIsNewProfile(false);
@@ -129,13 +119,12 @@ export default function OrganizerProfileSetupPage() {
             setIsLoading(false);
         }
     }, [user, userProfile, toast]);
-
     useEffect(() => {
         if (authLoading) {
             setIsLoading(true);
             return;
         }
-        if (!user || userProfile?.role !== 'organizer') {
+      if (!user || userProfile?.role !== 'organizer') {
             toast({ variant: "destructive", title: "Access Denied", description: "You must be an organizer to access this page." });
             router.replace("/dashboard");
         } else {
@@ -156,7 +145,6 @@ export default function OrganizerProfileSetupPage() {
     const handleSelectChange = (name: keyof OrganizerProfileFormData, value: string) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
-
     const handleCategoryChange = (category: string, checked: boolean) => {
         setFormData(prev => {
             const newCategories = checked
@@ -165,7 +153,6 @@ export default function OrganizerProfileSetupPage() {
             return { ...prev, categories: newCategories };
         });
     };
-
     const handleLanguageAdd = () => {
         if (newLanguage.trim() && !formData.languagesSpoken.includes(newLanguage.trim())) {
             setFormData(prev => ({
@@ -175,24 +162,20 @@ export default function OrganizerProfileSetupPage() {
             setNewLanguage("");
         }
     };
-
-    const handleLanguageRemove = (langToRemove: string) => {
+  const handleLanguageRemove = (langToRemove: string) => {
         setFormData(prev => ({
             ...prev,
             languagesSpoken: prev.languagesSpoken.filter(lang => lang !== langToRemove)
         }));
     };
-
     const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setImageFiles(Array.from(e.target.files));
         }
     };
-
     const handleRemoveImageUrl = (urlToRemove: string) => {
         setFormData(prev => ({...prev, imageUrls: prev.imageUrls.filter(url => url !== urlToRemove)}));
     };
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         if (!user) {
@@ -201,7 +184,6 @@ export default function OrganizerProfileSetupPage() {
         }
         setIsSaving(true);
         toast({ title: "Profile Update Initiated", description: "Saving your organizer profile..." });
-
         try {
             let uploadedImageUrls = [...formData.imageUrls];
             if (imageFiles.length > 0) {
@@ -209,44 +191,11 @@ export default function OrganizerProfileSetupPage() {
                     const imageRef = storageRef(firebaseStorage, `organizer_images/${user.uid}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9_.-]/g, '_')}`);
                     await uploadBytes(imageRef, file);
                     const downloadURL = await getDownloadURL(imageRef);
-                    uploadedImageUrls.push(downloadURL);
-                }
-            }
-            setImageFiles([]);
-
-            const dataToSave = {
-                ...formData,
-                imageUrls: uploadedImageUrls,
-                updatedAt: serverTimestamp(),
-                createdAt: isNewProfile ? serverTimestamp() : formData.createdAt,
-            };
-
-            const { id, ...finalDataForFirestore } = dataToSave;
-            const organizerDocRef = doc(db, "organizers", user.uid);
-            await setDoc(organizerDocRef, finalDataForFirestore, { merge: true });
-            
-            toast({ title: "Profile Saved", description: "Your organizer profile has been updated." });
-            router.push("/dashboard");
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "Save Failed", description: `Could not save your profile: ${error.message}`, duration: 7000 });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="ml-2">Loading Profile Setup...</p>
-            </div>
-        );
+                          );
     }
-
     if (!user || userProfile?.role !== 'organizer') {
         return null;
     }
-
     return (
         <div className="container mx-auto p-4 md:p-8">
             <Button variant="outline" onClick={() => router.back()} className="mb-6">
@@ -270,24 +219,8 @@ export default function OrganizerProfileSetupPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="organizationName"><UsersIcon className="inline h-4 w-4 mr-1 relative -top-0.5" />Organization Name (Optional)</Label>
                                     <Input id="organizationName" name="organizationName" value={formData.organizationName} onChange={handleChange} placeholder="e.g., The Artful Nomad Events" disabled={isSaving} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Contact Email</Label>
-                                    <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="contact@example.com" required disabled={isSaving} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone"><PhoneIcon className="inline h-4 w-4 mr-1 relative -top-0.5" />Phone (for WhatsApp)</Label>
-                                    <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="10-digit number" required disabled={isSaving} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="city">Location / City</Label>
-                                <Input id="city" name="city" value={formData.city} onChange={handleChange} placeholder="e.g., New York City" disabled={isSaving} />
-                            </div>
+                                                              </div>
                         </section>
-
                         {/* Professional Details Section */}
                         <section className="space-y-4 p-4 border rounded-md">
                             <h3 className="text-lg font-semibold border-b pb-2">Professional Details</h3>
@@ -318,21 +251,15 @@ export default function OrganizerProfileSetupPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="experienceDescription">Experience (Short Description)</Label>
                                 <Textarea id="experienceDescription" name="experienceDescription" value={formData.experienceDescription} onChange={handleChange} placeholder="e.g., 5+ years hosting workshops, performed at various local venues..." rows={3} disabled={isSaving} />
-                            </div>
-                             <div className="space-y-2">
-                                <Label htmlFor="newLanguage"><Languages className="inline h-4 w-4 mr-1 relative -top-0.5" />Languages Spoken</Label>
-                                <div className="flex items-center gap-2">
-                                    <Input id="newLanguage" value={newLanguage} onChange={e => setNewLanguage(e.target.value)} placeholder="e.g., English" disabled={isSaving}/>
-                                    <Button type="button" onClick={handleLanguageAdd} size="icon" variant="outline" disabled={isSaving}>
-                                        <PlusCircle className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                                                                   </Button>
+                                 </div>
                                 {formData.languagesSpoken.length > 0 && (
                                     <div className="mt-2 space-y-1 rounded-md border p-2 text-sm max-h-28 overflow-y-auto">
                                         {formData.languagesSpoken.map((lang, index) => (
                                             <div key={index} className="flex items-center justify-between bg-secondary p-1 rounded">
                                                 <span>{lang}</span>
                                                 <Button type="button" onClick={() => handleLanguageRemove(lang)} size="icon" variant="ghost" className="h-5 w-5" disabled={isSaving}>
+                                                <Button type="button" onClick={() => handleLanguageRemove(lang)} size="icon" variant="ghost" className="h-5 w-5" disabled={isSaving} aria-label="Remove language">
                                                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                                 </Button>
                                             </div>
@@ -341,7 +268,6 @@ export default function OrganizerProfileSetupPage() {
                                 )}
                             </div>
                         </section>
-
                          {/* Availability Section */}
                         <section className="space-y-4 p-4 border rounded-md">
                             <h3 className="text-lg font-semibold border-b pb-2">Availability</h3>
@@ -364,23 +290,7 @@ export default function OrganizerProfileSetupPage() {
                                 <>
                                 <div className="space-y-2">
                                     <Label htmlFor="availability"><CalendarDays className="inline h-4 w-4 mr-1 relative -top-0.5" />Preferred Days</Label>
-                                    <Textarea id="availability" name="availability" value={formData.availability} onChange={handleChange} placeholder="e.g., Weekends, or specific dates like 'Every Friday'" rows={2} disabled={isSaving} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="preferredTimeSlots"><Clock className="inline h-4 w-4 mr-1 relative -top-0.5" />Preferred Time Slots</Label>
-                                    <Input id="preferredTimeSlots" name="preferredTimeSlots" value={formData.preferredTimeSlots} onChange={handleChange} placeholder="e.g., Evenings 7 PM - 10 PM" disabled={isSaving} />
-                                </div>
-                                </>
-                            )}
-                        </section>
-
-                        {/* Images Section */}
-                        <section className="space-y-4 p-4 border rounded-md">
-                            <h3 className="text-lg font-semibold border-b pb-2"><ImageIcon className="inline h-5 w-5 mr-1 relative -top-0.5" />Profile & Event Photos</h3>
-                            <div className="space-y-2">
-                                <Label htmlFor="imageFiles">Upload Images (select one or more)</Label>
-                                <Input id="imageFiles" type="file" multiple onChange={handleImageFileChange} accept="image/*" disabled={isSaving}/>
-                                {imageFiles.length > 0 && <p className="text-xs text-muted-foreground">{imageFiles.length} file(s) selected for upload.</p>}
+                                                      {imageFiles.length > 0 && <p className="text-xs text-muted-foreground">{imageFiles.length} file(s) selected for upload.</p>}
                             </div>
                             {formData.imageUrls.length > 0 && (
                                 <div className="mt-3 space-y-2 rounded-md border p-3 max-h-48 overflow-y-auto">
@@ -390,6 +300,7 @@ export default function OrganizerProfileSetupPage() {
                                             <img src={url} alt={`Preview ${index}`} className="h-10 w-10 object-cover rounded-sm mr-2" data-ai-hint="event photo" />
                                             <a href={url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline flex-1">{url}</a>
                                             <Button type="button" onClick={() => handleRemoveImageUrl(url)} size="icon" variant="ghost" className="h-6 w-6" disabled={isSaving}>
+                                            <Button type="button" onClick={() => handleRemoveImageUrl(url)} size="icon" variant="ghost" className="h-6 w-6" disabled={isSaving} aria-label="Remove image">
                                                 <Trash2 className="h-4 w-4 text-destructive"/>
                                             </Button>
                                         </div>
@@ -402,7 +313,6 @@ export default function OrganizerProfileSetupPage() {
                                 <p className="text-xs text-muted-foreground">Keywords for placeholder images (max 2 words).</p>
                             </div>
                         </section>
-
                         {/* Social Links & Requirements Section */}
                          <section className="space-y-4 p-4 border rounded-md">
                             <h3 className="text-lg font-semibold border-b pb-2"><LinkIcon className="inline h-5 w-5 mr-1 relative -top-0.5" />Social Media & Links</h3>
@@ -411,7 +321,7 @@ export default function OrganizerProfileSetupPage() {
                                 <div className="space-y-2"><Label htmlFor="socialLinks.facebook">Facebook</Label><Input id="socialLinks.facebook" name="socialLinks.facebook" value={formData.socialLinks.facebook} onChange={handleChange} placeholder="https://facebook.com/yourpage" disabled={isSaving} /></div>
                                 <div className="space-y-2"><Label htmlFor="socialLinks.website">Website/Portfolio</Label><Input id="socialLinks.website" name="socialLinks.website" value={formData.socialLinks.website} onChange={handleChange} placeholder="https://yourwebsite.com" disabled={isSaving} /></div>
                                 <div className="space-y-2"><Label htmlFor="socialLinks.youtube">YouTube Channel</Label><Input id="socialLinks.youtube" name="socialLinks.youtube" value={formData.socialLinks.youtube} onChange={handleChange} placeholder="https://youtube.com/yourchannel" disabled={isSaving} /></div>
-                            </div>
+                              </div>
                         </section>
                         <section className="space-y-4 p-4 border rounded-md">
                             <h3 className="text-lg font-semibold border-b pb-2">More About You</h3>
@@ -424,8 +334,6 @@ export default function OrganizerProfileSetupPage() {
                                 <Textarea id="specialRequirements" name="specialRequirements" value={formData.specialRequirements} onChange={handleChange} placeholder="e.g., Min. stage size, specific audio setup, quiet room for workshops." rows={3} disabled={isSaving}/>
                             </div>
                         </section>
-
-
                         <Button type="submit" disabled={isSaving} className="w-full md:w-auto text-lg py-3 px-6">
                             {isSaving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                             {isSaving ? 'Saving Profile...' : (isNewProfile ? 'Create Profile' : 'Update Profile')}
